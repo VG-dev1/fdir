@@ -14,6 +14,8 @@
   - File type/extension (`--eq`)
 - Sort results by:
   - Name, size, or modification date (`--order <field> <a|d>`)
+- Use and/or
+- Delete results (`--del`)
 
 ## Examples
 
@@ -23,6 +25,7 @@ fdir size --lt 100MB --order modified d
 fdir name --keyword report --order size a
 fdir type --eq .py --order name d
 fdir all --order modified a
+fdir modified --gt 1y or size --gt 1gb
 ```
 
 ## Installation
