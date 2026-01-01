@@ -3,6 +3,10 @@
 import sys
 from pathlib import Path
 from datetime import datetime, timedelta
+import os
+
+RESET = "\033[0m"
+YELLOW = "\033[33m"
 
 def usage():
     print(
@@ -76,7 +80,7 @@ def parse_time(value: str) -> timedelta:
         case "y":
             return timedelta(days=amount * 365)
         case _:
-            print (f"error: Unknown time unit: {unit!r}")
+            print (f"error: Unknown time unit.")
             sys.exit(1)
         
 def parse_size(value: str):
@@ -122,323 +126,140 @@ def readable_size(size_bytes):
     else:
         return f"{size:.1f} {units[i]}"
     
-def print_files(matching_files):
-    for file in range (len(matching_files)):
-        name = matching_files[file][0]
-        date = matching_files[file][1]
-        size = matching_files[file][2]
-        print(f"{name} | {date} | {size}")
+def highlight(text, color):
+    return f"{color}{text}{RESET}"
+
+def file_link(text, url):
+    return f"\033]8;;{url}\033\\{text}\033]8;;\033\\"
+
+def print_files(matching_files, first_op, second_op):
+    for file_info in matching_files:
+        name, date, size = file_info[0], file_info[1], file_info[2]
+
+        ops = [first_op, second_op]
+        
+        if "modified" in ops:
+            date = highlight(date, YELLOW)
+        if "size" in ops:
+            size = highlight(size, YELLOW)
+        if "name" in ops:
+            name = highlight(name, YELLOW)
+
+        path = os.path.abspath(file_info[0])
+        url = f"file:///{path.replace(os.sep,'/')}"
+
+        linked_name = file_link(name, url)
+
+        print(f"{linked_name} | {date} | {size}")
+
+def delete_files(matching_files):
+    for file in matching_files:
+        name = file[0]
+        os.remove(name)
+
+def satisfies_criteria(path, op, flag, value):
+    if op == "all": return True
+    if op == "size":
+        cutoff = parse_size(value)
+        return path.stat().st_size > cutoff if flag == "--gt" else path.stat().st_size < cutoff
+    if op == "modified":
+        cutoff = datetime.now() - parse_time(value)
+        modified = datetime.fromtimestamp(path.stat().st_mtime)
+        return modified <= cutoff if flag == "--gt" else modified >= cutoff
+    if op == "name":
+        name_arg = value.lower()
+        file_name = path.name.lower()
+        if flag == "--keyword": return name_arg in file_name
+        if flag == "--swith": return file_name.startswith(name_arg)
+        if flag == "--ewith": return file_name.endswith(name_arg)
+    if op == "type":
+        return path.suffix == value
+    return False
 
 def main():
     if len(sys.argv) == 1:
-        # No arguments at all
-        print("error: No operation entered.")
-        print ("suggestion: Type 'fdir help' for a list of commands.")
+        print("error: No operation entered.\nsuggestion: Type 'fdir help'.")
         sys.exit(1)
 
-    op = sys.argv[1]
-
-    if op == "help":
+    if sys.argv[1] == "help":
         usage()
         sys.exit(0)
 
-    def parse_order(args, default_len):
-        order_field = None
-        order_dir = None
-        if len(args) == default_len + 2:
-            if args[-2] != "--order" or args[-1] not in ("a", "d", "modified", "name", "size"):
-                pass
-            else:
-                print("error: Invalid --order flag or value.")
+    connector = None
+    if "or" in sys.argv: connector = "or"
+    elif "and" in sys.argv: connector = "and"
+
+    order_field, order_dir = None, None
+    if "--order" in sys.argv:
+        idx = sys.argv.index("--order")
+        order_field = sys.argv[idx + 1]
+        order_dir = sys.argv[idx + 2]
+
+    first_op = sys.argv[1]
+    first_flag, first_val = None, None
+    if first_op != "all" and first_op in ["modified", "size", "type", "name", "all"]:
+        if len(sys.argv) >= 4:
+            first_flag = sys.argv[2]
+            first_val = sys.argv[3]
+            if not (first_op == "modified" and first_flag in ["--gt", "--lt"]) or (first_op == "size" and first_flag in ["--gt", "--lt"]) or (first_op == "type" and first_flag in ["--eq"]) or (first_op == "name" and first_flag in ["--keyword", "--swith", "--ewith"]):
+                print("error: Invalid arguments for operation.")
                 sys.exit(1)
-        if len(args) >= default_len + 3:
-            if args[-3] != "--order":
-                print("error: Invalid --order flag.")
-                sys.exit(1)
-            order_field = args[-2]
-            order_dir = args[-1]
-            if order_field not in ("modified", "name", "size") or order_dir not in ("a","d"):
-                print("error: Invalid --order value.")
-                sys.exit(1)
-        return order_field, order_dir
-
-    if op == "modified":
-        if len(sys.argv) < 4:
-            print("error: The entered operation has invalid arguments.")
+        else:
+            print("error: Missing arguments for operation.")
             sys.exit(1)
+    elif first_op == "all":
+        pass
+    elif first_op not in ["modified", "size", "type", "name", "all"]:
+        print("error: Invalid operation.")
+        sys.exit(1)
 
-        matching_files = []
+    second_op, second_flag, second_val = None, None, None
+    if connector:
+        conn_idx = sys.argv.index(connector)
+        second_op = sys.argv[conn_idx + 1]
+        second_flag = sys.argv[conn_idx + 2]
+        second_val = sys.argv[conn_idx + 3]
 
-        cmp_flag = sys.argv[2]
-        time_arg = sys.argv[3]
-        file_count = 0
+    matching_files = []
+    for path in Path.cwd().iterdir():
+        if not (path.is_file() or path.is_dir()): continue
+        
+        match1 = satisfies_criteria(path, first_op, first_flag, first_val)
+        
+        if connector:
+            match2 = satisfies_criteria(path, second_op, second_flag, second_val)
+            final_match = (match1 or match2) if connector == "or" else (match1 and match2)
+        else:
+            final_match = match1
 
-        order_field, order_dir = parse_order(sys.argv, 4)
-
-        if cmp_flag not in ("--gt", "--lt"):
-            print("error: The entered flag doesn't exist.")
-            sys.exit(1)
-
-        try:
-            span = parse_time(time_arg)
-        except ValueError as e:
-            print(f"error: {e}", file=sys.stderr)
-            sys.exit(1)
-
-        cutoff = datetime.now() - span
-
-        for path in Path.cwd().iterdir():
-            if not (path.is_file() or path.is_dir()):
-                continue
-
-            modified = datetime.fromtimestamp(path.stat().st_mtime)
-
-            match_condition = modified <= cutoff if cmp_flag == "--gt" else modified >= cutoff
-
+        if final_match:
             name = path.name
-            date = modified.strftime("%d/%m/%y")
-            size = readable_size(path.stat().st_size)
+            raw_mtime = path.stat().st_mtime
+            raw_size = path.stat().st_size
+            date_str = datetime.fromtimestamp(raw_mtime).strftime("%d/%m/%y")
+            size_str = readable_size(raw_size)
 
-            if match_condition:
-                matching_files.append([name, date, size])
-                file_count += 1
+            matching_files.append([name, date_str, size_str, raw_mtime, raw_size, path])
 
-        if order_field:
-            if order_field == "name":
-                matching_files.sort(key=lambda x: x[0].lower(), reverse=(order_dir=="d"))
-            elif order_field == "size":
-                def size_to_bytes(s):
-                    number, unit = s.split()
-                    number = float(number)
-                    units = ["B","KB","MB","GB","TB","PB"]
-                    factor = 1024 ** units.index(unit)
-                    return int(number * factor)
-                matching_files.sort(key=lambda x: size_to_bytes(x[2]), reverse=(order_dir=="d"))
-            elif order_field == "modified":
-                matching_files.sort(key=lambda x: datetime.strptime(x[1], "%d/%m/%y"), reverse=(order_dir=="d"))
+    if order_field:
+        rev = (order_dir == "d")
+        if order_field == "name":
+            matching_files.sort(key=lambda x: x[0].lower(), reverse=rev)
+        elif order_field == "modified":
+            matching_files.sort(key=lambda x: x[3], reverse=rev)
+        elif order_field == "size":
+            matching_files.sort(key=lambda x: x[4], reverse=rev)
 
-        print_files(matching_files)
-        print (f"Showing {file_count} files.")
-        sys.exit(0)
+    print_files(matching_files, first_op, second_op)
+    if "--del" in sys.argv:
+        delete_files(matching_files)
+        print (f"Deleted {len(matching_files)} files.")
     
-    if op == "size":
-        if len(sys.argv) < 4:
-            print("error: The entered operation has invalid arguments.")
-            sys.exit(1)
-
-        matching_files = []
-
-        cmp_flag = sys.argv[2]
-        size_arg = sys.argv[3]
-        file_count = 0
-
-        order_field, order_dir = parse_order(sys.argv, 4)
-
-        if cmp_flag not in ("--gt", "--lt"):
-            print("error: The entered flag doesn't exist.")
-            sys.exit(1)
-
-        try:
-            cutoff_size = parse_size(size_arg)
-        except ValueError as e:
-            print(f"error: {e}", file=sys.stderr)
-            sys.exit(1)
-
-        for path in Path.cwd().iterdir():
-            if not (path.is_file() or path.is_dir()):
-                continue
-
-            file_size = path.stat().st_size
-
-            if cmp_flag == "--gt":
-                match_condition = file_size > cutoff_size
-            else:
-                match_condition = file_size < cutoff_size
-
-            name = path.name
-            date = datetime.fromtimestamp(path.stat().st_mtime)
-            date = date.strftime("%d/%m/%y")
-            size = readable_size(path.stat().st_size)
-
-            if match_condition:
-                matching_files.append([name, date, size])
-                file_count += 1
-
-        if order_field:
-            if order_field == "name":
-                matching_files.sort(key=lambda x: x[0].lower(), reverse=(order_dir=="d"))
-            elif order_field == "size":
-                def size_to_bytes(s):
-                    number, unit = s.split()
-                    number = float(number)
-                    units = ["B","KB","MB","GB","TB","PB"]
-                    factor = 1024 ** units.index(unit)
-                    return int(number * factor)
-                matching_files.sort(key=lambda x: size_to_bytes(x[2]), reverse=(order_dir=="d"))
-            elif order_field == "modified":
-                matching_files.sort(key=lambda x: datetime.strptime(x[1], "%d/%m/%y"), reverse=(order_dir=="d"))
-
-        print_files(matching_files)
-        print (f"Showing {file_count} files.")
-        sys.exit(0)
-
-    if op == "name":
-        if len(sys.argv) < 4:
-            print("error: The entered operation has invalid arguments.")
-            sys.exit(1)
-
-        matching_files = []
-
-        cmp_flag = sys.argv[2]
-        name_arg = sys.argv[3]
-        file_count = 0
-
-        order_field, order_dir = parse_order(sys.argv, 4)
-
-        if cmp_flag not in ("--keyword", "--swith", "--ewith"):
-            print("error: The entered flag doesn't exist.")
-            sys.exit(1)
-
-        for path in Path.cwd().iterdir():
-            if not (path.is_file() or path.is_dir()):
-                continue
-            
-            name_arg.lower()
-            file_name = path.name.lower()
-            match_condition = False
-
-            if cmp_flag == "--keyword":
-                match_condition = name_arg in file_name
-            
-            elif cmp_flag == "--swith":
-                match_condition = file_name.startswith(name_arg)
-                
-            elif cmp_flag == "--ewith":
-                match_condition = file_name.endswith(name_arg)
-
-            name = path.name
-            date = datetime.fromtimestamp(path.stat().st_mtime)
-            date = date.strftime("%d/%m/%y")
-            size = readable_size(path.stat().st_size)
-
-            if match_condition:
-                matching_files.append([name, date, size])
-                file_count += 1
-
-        if order_field:
-            if order_field == "name":
-                matching_files.sort(key=lambda x: x[0].lower(), reverse=(order_dir=="d"))
-            elif order_field == "size":
-                def size_to_bytes(s):
-                    number, unit = s.split()
-                    number = float(number)
-                    units = ["B","KB","MB","GB","TB","PB"]
-                    factor = 1024 ** units.index(unit)
-                    return int(number * factor)
-                matching_files.sort(key=lambda x: size_to_bytes(x[2]), reverse=(order_dir=="d"))
-            elif order_field == "modified":
-                matching_files.sort(key=lambda x: datetime.strptime(x[1], "%d/%m/%y"), reverse=(order_dir=="d"))
-
-        print_files(matching_files)
-        print (f"Showing {file_count} files.")
-        sys.exit(0)
-
-    if op == "type":
-        if len(sys.argv) < 4:
-            print("error: The entered operation has invalid arguments.")
-            sys.exit(1)
-
-        matching_files = []
-
-        cmp_flag = sys.argv[2]
-        type_arg = sys.argv[3]
-        file_count = 0
-
-        order_field, order_dir = parse_order(sys.argv, 4)
-
-        if cmp_flag not in ("--eq"):
-            print("error: The entered flag doesn't exist.")
-            sys.exit(1)
-
-        for path in Path.cwd().iterdir():
-            if not path.is_file():
-                continue
-
-            file_extension = path.suffix
-            match_condition = type_arg == file_extension
-
-            name = path.name
-            date = datetime.fromtimestamp(path.stat().st_mtime)
-            date = date.strftime("%d/%m/%y")
-            size = readable_size(path.stat().st_size)
-
-            if match_condition:
-                matching_files.append([name, date, size])
-                file_count += 1
-
-        if order_field:
-            if order_field == "name":
-                matching_files.sort(key=lambda x: x[0].lower(), reverse=(order_dir=="d"))
-            elif order_field == "size":
-                def size_to_bytes(s):
-                    number, unit = s.split()
-                    number = float(number)
-                    units = ["B","KB","MB","GB","TB","PB"]
-                    factor = 1024 ** units.index(unit)
-                    return int(number * factor)
-                matching_files.sort(key=lambda x: size_to_bytes(x[2]), reverse=(order_dir=="d"))
-            elif order_field == "modified":
-                matching_files.sort(key=lambda x: datetime.strptime(x[1], "%d/%m/%y"), reverse=(order_dir=="d"))
-
-        print_files(matching_files)
-        print (f"Showing {file_count} files.")
-        sys.exit(0)
-
-    if op == "all":
-        if len(sys.argv) < 2:
-            print("error: The entered operation has invalid arguments.")
-            sys.exit(1)
-
-        matching_files = []
-
-        file_count = 0
-
-        order_field, order_dir = parse_order(sys.argv, 2)
-
-        for path in Path.cwd().iterdir():
-            if not (path.is_file() or path.is_dir()):
-                continue
-            
-            # File information
-            name = path.name
-            date = datetime.fromtimestamp(path.stat().st_mtime)
-            date = date.strftime("%d/%m/%y")
-            size = readable_size(path.stat().st_size)
-            
-            matching_files.append([name, date, size])
-            file_count += 1
-
-        if order_field:
-            if order_field == "name":
-                matching_files.sort(key=lambda x: x[0].lower(), reverse=(order_dir=="d"))
-            elif order_field == "size":
-                def size_to_bytes(s):
-                    number, unit = s.split()
-                    number = float(number)
-                    units = ["B","KB","MB","GB","TB","PB"]
-                    factor = 1024 ** units.index(unit)
-                    return int(number * factor)
-                matching_files.sort(key=lambda x: size_to_bytes(x[2]), reverse=(order_dir=="d"))
-            elif order_field == "modified":
-                matching_files.sort(key=lambda x: datetime.strptime(x[1], "%d/%m/%y"), reverse=(order_dir=="d"))
-
-        print_files(matching_files)
-        print (f"Showing {file_count} files.")
-        sys.exit(0)
-
-    # Unknown operation
-    print("error: The entered operation doesn't exist.")
-    sys.exit(1)
+    total = 0
+    for file in matching_files:
+        total += file[4]
+    total = str(readable_size(total))
+    print(f"Showing {len(matching_files)} files ({total}).")
 
 if __name__ == "__main__":
     main()
