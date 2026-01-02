@@ -201,9 +201,15 @@ def main():
         if len(sys.argv) >= 4:
             first_flag = sys.argv[2]
             first_val = sys.argv[3]
-            if not (first_op == "modified" and first_flag in ["--gt", "--lt"]) or (first_op == "size" and first_flag in ["--gt", "--lt"]) or (first_op == "type" and first_flag in ["--eq"]) or (first_op == "name" and first_flag in ["--keyword", "--swith", "--ewith"]):
+            if not (
+                (first_op == "modified" and first_flag in ["--gt", "--lt"]) or
+                (first_op == "size" and first_flag in ["--gt", "--lt"]) or
+                (first_op == "type" and first_flag in ["--eq"]) or
+                (first_op == "name" and first_flag in ["--keyword", "--swith", "--ewith"])
+            ):
                 print("error: Invalid arguments for operation.")
                 sys.exit(1)
+
         else:
             print("error: Missing arguments for operation.")
             sys.exit(1)
