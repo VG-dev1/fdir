@@ -18,6 +18,8 @@
   - Name, size, or modification date (`--order <field> <a|d>`)
 - Use and/or
 - Delete results (`--del`)
+- Field highlighting in yellow (e.g. using the `modified` operation would highlight the printed dates)
+- Hyperlinks to open matching files
 
 ## Demo
 
@@ -36,40 +38,61 @@ fdir modified --gt 1y or size --gt 1gb
 
 ## Usage
 
-fdir <operation> [options] [--order <field> <a|d>]
+`fdir <operation> [options] [--order <field> <a|d>]`
 
-Operations:
-  modified (--gt | --lt) <time>      Filter files by last modified date
-  size (--gt | --lt) <size>          Filter files by size
-  name (--keyword | --swith | --ewith) <pattern>  Filter files by name
-  type (--eq) <extension>            Filter files by file extension
-  all                                 List all files and directories
+#### Operations
 
-Time units for 'modified':
-  h   hours
-  d   days
-  w   weeks
-  m   months (approx. 30 days)
-  y   years (approx. 365 days)
+| Operation | Flags | Description |
+|----------|-------|-------------|
+| `modified` | `--gt \| --lt <time>` | Filter files by last modified date |
+| `size`     | `--gt \| --lt <size>` | Filter files by file size |
+| `name`     | `--keyword \| --swith \| --ewith <pattern>` | Filter files by name |
+| `type`     | `--eq <extension>` | Filter files by file extension |
+| `all`      | — | List all files and directories |
 
-Size units for 'size':
-  B   bytes
-  KB  kilobytes
-  MB  megabytes
-  GB  gigabytes
 
-Name flags for 'name':
-  --keyword   Match if filename contains the pattern
-  --swith     Match if filename starts with the pattern
-  --ewith     Match if filename ends with the pattern
 
-Type flags for 'type':
-  --eq        Match exact file extension (include the dot, e.g., .py)
+#### Time Units (modified)
 
-Optional sorting:
-  --order <field> <a|d>   Sort the output by the specified field
-                           field: name, size, modified
-                           a = ascending, d = descending
+| Unit | Meaning |
+|-----|--------|
+| `h` | Hours |
+| `d` | Days |
+| `w` | Weeks |
+| `m` | Months (approx. 30 days) |
+| `y` | Years (approx. 365 days) |
+
+
+#### Size Units (size)
+
+| Unit | Meaning |
+|-----|--------|
+| `B`  | Bytes |
+| `KB` | Kilobytes |
+| `MB` | Megabytes |
+| `GB` | Gigabytes |
+
+
+#### Name Flags (name)
+
+| Flag | Description |
+|------|-------------|
+| `--keyword` | Filename contains the pattern |
+| `--swith` | Filename starts with the pattern |
+| `--ewith` | Filename ends with the pattern |
+
+
+#### Type Flags (type)
+
+| Flag | Description |
+|------|-------------|
+| `--eq` | Match exact file extension (include the dot, e.g. `.py`) |
+
+
+#### Optional Sorting
+
+`--order <field> <a|d>`
+
 
 ## Installation
 
