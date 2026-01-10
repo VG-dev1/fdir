@@ -1,8 +1,27 @@
-# fdir
+<h1 align="center">fdir</h1>
 
-**fdir** is a simple command-line utility to list, filter, and sort files and folders in your current directory. It provides a more flexible alternative to Windows's 'dir' command.
 
-[![Latest Release](https://img.shields.io/github/v/release/VG-dev1/fdir)](https://github.com/VG-dev1/fdir/releases)
+<p align="center">
+  <i>Find and organize anything on your system</i>
+</p>
+
+<p align="center">
+  <img src="assets/demo2.png" alt="fdir demo" width="700">
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/github/downloads/VG-dev1/fdir/total" alt="GitHub Downloads (all assets, latest release)">
+
+  <a href="https://github.com/VG-dev1/fdir/releases">
+    <img src="https://img.shields.io/github/v/release/VG-dev1/fdir" alt="Latest Release">
+  </a>
+
+  <img alt="GitHub Repo stars" src="https://img.shields.io/github/stars/VG-dev1/fdir">
+
+  <a href="https://github.com/VG-dev1/fdir/blob/main/LICENSE.md">
+    <img alt="GitHub License" src="https://img.shields.io/github/license/VG-dev1/fdir">
+  </a>
+</p>
 
 ---
 
@@ -18,22 +37,24 @@
   - Name, size, or modification date (`--order <field> <a|d>`)
 - Use and/or
 - Delete results (`--del`)
+- Convert results to a different extension (`--convert`, available for the `type` operation)
+- Search approximately (`--fuzzy`)
+- Search the content of files
 - Field highlighting in yellow (e.g. using the `modified` operation would highlight the printed dates)
+  - With partial highlighting for the `name` operation
 - Hyperlinks to open matching files
-
-## Demo
-
-![Example usage](assets/demo1.png)
+- Heatmap size field letter coloring (blue -> red)
+- Add .fdirignore to your directory to make fdir ignore certain files, directories or extensions
 
 ## Examples
 
 ```bash
-fdir modified --gt 1y --order name a
-fdir size --lt 100MB --order modified d
-fdir name --keyword report --order size a
-fdir type --eq .py --order name d
-fdir all --order modified a
-fdir modified --gt 1y or size --gt 1gb
+fdir modified --gt 1y --order name a  # Show files older than 1 year, in the ascending order by name
+fdir size --lt 100MB --order modified d  # Show files smaller than 100MB, in the descending order by modified
+fdir name --keyword report --order size a --deep  # Show files containing the "report" keyword, in the ascending order by size, and search recursively
+fdir type --eq .wav --order name d --convert .mp3  # Show files with the ".wav" extension, in the descending order by name, and convert them to ".mp3"
+fdir all --order modified a  # Show all files in the ascending order by modified
+fdir modified --gt 1y or size --gt 1gb --del  # Show files older than 1 year old larger than 1GB, and delete them
 ```
 
 ## Usage
@@ -49,7 +70,8 @@ fdir modified --gt 1y or size --gt 1gb
 | `name`     | `--keyword \| --swith \| --ewith <pattern>` | Filter files by name |
 | `type`     | `--eq <extension>` | Filter files by file extension |
 | `all`      | — | List all files and directories |
-
+| `version`  | — | Display the installed version of fdir
+| `content`  | `--keyword <pattern>` | Search the content of textual files
 
 
 #### Time Units (modified)
@@ -89,9 +111,14 @@ fdir modified --gt 1y or size --gt 1gb
 | `--eq` | Match exact file extension (include the dot, e.g. `.py`) |
 
 
-#### Optional Sorting
+#### Additional flags
 
-`--order <field> <a|d>`
+| Flag | Description |
+|------|-------------|
+| `--order` | Sort files in a specific order |
+| `--deep`  | Search recursively |
+| `--top`  | Print only the first certain amount of matches |
+| `--fuzzy` | Search approximately (make fdir support typos) |
 
 
 ## Installation
