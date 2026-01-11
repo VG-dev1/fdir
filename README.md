@@ -123,12 +123,20 @@ fdir modified --gt 1y or size --gt 1gb --del  # Show files older than 1 year old
 
 ## Installation
 
+### Windows
+
 1. Download the "fdir.exe" file from the Releases tab.
-
 2. Create a new folder in %USERPROFILE% on your computer.
-
 3. Paste the downloaded "fdir.exe" file into that folder.
-
 4. Copy the path of that folder.
-
 5. Put the path of that folder into your system's PATH (run `setx PATH "%PATH%;C:\path\to\fdir_folder"` (replace the path with your actual path)).
+
+### Linux
+
+1. Download the "fdir" file from the Releases tab.
+2. Go to the downloaded "fdir" file's folder (run `cd path/to/your/folder` (replace the path with your actual path)).
+3. Copy that path into `~/.local/bin` (run `cp fdir ~/.local/bin`).
+
+### MacOS
+
+Sorry, not available yet.
