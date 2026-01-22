@@ -9,6 +9,8 @@ from difflib import SequenceMatcher
 import shutil
 import time
 import re
+import subprocess
+import argparse
 
 RESET = "\033[0m"
 YELLOW_BG = "\033[43m"
@@ -30,8 +32,8 @@ OPERATIONS
              --swith <pattern>      Name starts with pattern
              --ewith <pattern>      Name ends with pattern
   type       --eq <extension>       Match file extension (e.g. .py)
-  all                             List all files and directories
-  version                         Show fdir version
+  all                               List all files and directories
+  version                           Show fdir version
 
 TIME UNITS (modified)
   h    hours
@@ -49,16 +51,19 @@ SIZE UNITS (size)
 ADDITIONAL FLAGS
   --order <field> <a|d>   Sort by: name | size | modified
                           a = ascending, d = descending
+  --columns <3-chars>     Column order: n (name), d (date), s (size)
+                          Example: nds
   --deep                  Search recursively
   --top <n>               Show only first N results
   --fuzzy                 Search approximately
   --del                   Delete matching files
   --convert               Convert matching files
+  -exec <command>         Execute command for each match (use {} for path)
 """
     )
 
 def version():
-    print ("fdir v3.1.0, check the GitHub repo for new updates: https://github.com/VG-dev1/fdir")
+    print ("fdir v3.2.0, check the GitHub repo for new updates: https://github.com/VG-dev1/fdir")
 
 def parse_time(value: str) -> timedelta:
     if len(value) < 2:
@@ -152,55 +157,23 @@ def color_by_size(text, size_bytes):
 def file_link(text, url):
     return f"\033]8;;{url}\033\\{text}\033]8;;\033\\"
 
-def print_files(matching_files, first_op, first_val, second_op, second_val):
-    for file_info in matching_files:
-        name, date, size_str = file_info[0], file_info[1], file_info[2]
-        raw_size = file_info[4]
-
-        date_display = highlight(f" {date} ", YELLOW_BG) if first_op == "modified" or second_op == "modified" else f" {date} "
-
-        padded_size = f"{size_str:>10}"
-        if first_op == "size" or second_op == "size":
-            display_size = highlight(f" {padded_size} ", YELLOW_BG)
-        else:
-            display_size = f" {padded_size} "
-        display_size = color_by_size(display_size, raw_size)
-
-        name_display = name
-        keywords = []
-        if first_op == "name" and first_val: keywords.append(first_val)
-        if second_op == "name" and second_val: keywords.append(second_val)
-
-        for kw in keywords:
-            pattern = re.compile(re.escape(kw), re.IGNORECASE)
-            name_display = pattern.sub(lambda m: highlight(m.group(0), YELLOW_BG), name_display)
-
-        path_abs = os.path.abspath(file_info[5])
-        url = f"file:///{path_abs.replace(os.sep,'/')}"
-        linked_name = file_link(name_display, url)
-
-        print(f"{date_display} | {display_size} | {linked_name}")
-
-def delete_files(matching_files):
-    for file in matching_files:
-        path = file[5]
-        if path.exists():
-            if path.is_dir():
-                shutil.rmtree(path)
-            else:
-                os.remove(path)
-
-def convert_files(matching_files, new_extension):
-    for file in matching_files:
-        old_path = file[5]
-        if old_path.is_file():
-            new_path = old_path.with_suffix(new_extension)
-            old_path.rename(new_path)
-
 def fuzzy_match(query, file_name, threshold=0.6):
     name_only = file_name.rsplit('.', 1)[0]
     ratio = SequenceMatcher(None, query.lower(), name_only.lower()).ratio()
     return ratio >= threshold
+
+def check_file_content(p, val, case_sensitive):
+    if not p.is_file(): return False
+    try:
+        with open(p, "r", encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                if not case_sensitive:
+                    if val.lower() in line.lower(): return True
+                else:
+                    if val in line: return True
+    except Exception:
+        pass
+    return False
 
 def satisfies_criteria(path_name, stat_info, op, flag, value, ignore, case_sensitive, fuzzy, content_found):
     for pattern in ignore:
@@ -223,7 +196,7 @@ def satisfies_criteria(path_name, stat_info, op, flag, value, ignore, case_sensi
             name_arg = value
             file_name = path_name
         if fuzzy and flag == "--keyword":
-            return fuzzy_match(value, file_name)
+            return fuzzy_match(value, path_name)
         else:
             if flag == "--keyword": return name_arg in file_name
             if flag == "--swith": return file_name.startswith(name_arg)
@@ -234,19 +207,57 @@ def satisfies_criteria(path_name, stat_info, op, flag, value, ignore, case_sensi
         return content_found
     return False
 
-def get_files(directory, recursive):
-    if recursive:
-        for root, dirs, files in os.walk(directory):
-            for name in dirs + files:
-                yield Path(root) / name
-    else:
-        with os.scandir(directory) as it:
-            for entry in it:
-                yield Path(entry.path)
-
 def main():
     if os.name == 'nt':
         os.system('color')
+
+    parent_parser = argparse.ArgumentParser(add_help=False)
+    parent_parser.add_argument("--deep", action="store_true")
+    parent_parser.add_argument("--top", type=int)
+    parent_parser.add_argument("--fuzzy", action="store_true")
+    parent_parser.add_argument("--case", action="store_true")
+    parent_parser.add_argument("--order", nargs=2)
+    parent_parser.add_argument("--columns", default="dsn")
+    parent_parser.add_argument("--del", action="store_true", dest="delete_flag")
+    parent_parser.add_argument("--convert")
+    parent_parser.add_argument("--nocolor", action="store_true")
+    parent_parser.add_argument("--exec", nargs=argparse.REMAINDER)
+
+    parser = argparse.ArgumentParser(prog="fdir", parents=[parent_parser], add_help=False)
+    subparsers = parser.add_subparsers(dest="operation")
+
+    mod_parser = subparsers.add_parser("modified", parents=[parent_parser], add_help=False)
+    mod_parser.add_argument("--gt")
+    mod_parser.add_argument("--lt")
+
+    size_parser = subparsers.add_parser("size", parents=[parent_parser], add_help=False)
+    size_parser.add_argument("--gt")
+    size_parser.add_argument("--lt")
+
+    name_parser = subparsers.add_parser("name", parents=[parent_parser], add_help=False)
+    name_parser.add_argument("--keyword")
+    name_parser.add_argument("--swith")
+    name_parser.add_argument("--ewith")
+
+    type_parser = subparsers.add_parser("type", parents=[parent_parser], add_help=False)
+    type_parser.add_argument("--eq")
+
+    cont_parser = subparsers.add_parser("content", parents=[parent_parser], add_help=False)
+    cont_parser.add_argument("--keyword")
+
+    subparsers.add_parser("all", parents=[parent_parser], add_help=False)
+    subparsers.add_parser("version", parents=[parent_parser], add_help=False)
+    subparsers.add_parser("help", parents=[parent_parser], add_help=False)
+
+    args, unknown = parser.parse_known_args()
+
+    if args.operation == "help":
+        usage()
+        sys.exit(0)
+    
+    if args.operation == "version":
+        version()
+        sys.exit(0)
 
     try:
         with open(".fdirignore", "r", encoding="utf-8") as f:
@@ -254,85 +265,32 @@ def main():
     except FileNotFoundError:
         ignore = []
 
-    if len(sys.argv) == 1:
-        print("error: No operation entered.\nsuggestion: Type 'fdir help'.")
-        sys.exit(1)
-
-    if sys.argv[1] == "help":
-        usage()
-        sys.exit(0)
-    if sys.argv[1] == "version":
-        version()
-        sys.exit(0)
-
     connector = None
-    if "or" in sys.argv: connector = "or"
-    elif "and" in sys.argv: connector = "and"
-
-    order_field, order_dir = None, None
-    if "--order" in sys.argv:
-        idx = sys.argv.index("--order")
-        try:
-            order_field = sys.argv[idx + 1]
-            order_dir = sys.argv[idx + 2]
-        except IndexError:
-            print("error: Missing arguments for --order.")
-            sys.exit(1)
-
-    first_op = sys.argv[1]
-    first_flag, first_val = None, None
-    if first_op != "all" and first_op in ["modified", "size", "type", "name", "content"]:
-        try:
-            first_flag = sys.argv[2]
-            first_val = sys.argv[3]
-        except IndexError:
-            print("error: Missing arguments for operation.")
-            sys.exit(1)
-            
-        if not (
-            (first_op == "modified" and first_flag in ["--gt", "--lt"]) or
-            (first_op == "size" and first_flag in ["--gt", "--lt"]) or
-            (first_op == "type" and first_flag in ["--eq"]) or
-            (first_op == "name" and first_flag in ["--keyword", "--swith", "--ewith"]) or
-            (first_op == "content" and first_flag in ["--keyword"])
-        ):
-            print("error: Invalid arguments for operation.")
-            sys.exit(1)
-    elif first_op == "all":
-        pass
-    else:
-        print("error: Invalid operation.")
-        sys.exit(1)
-
     second_op, second_flag, second_val = None, None, None
-    if connector:
-        try:
-            conn_idx = sys.argv.index(connector)
-            second_op = sys.argv[conn_idx + 1]
-            second_flag = sys.argv[conn_idx + 2]
-            second_val = sys.argv[conn_idx + 3]
-        except IndexError:
-            print(f"error: Missing arguments after '{connector}'.")
-            sys.exit(1)
+    for conn in ["and", "or"]:
+        if conn in unknown:
+            connector = conn
+            conn_idx = unknown.index(conn)
+            try:
+                second_op = unknown[conn_idx + 1]
+                second_flag = unknown[conn_idx + 2]
+                second_val = unknown[conn_idx + 3]
+            except IndexError:
+                print(f"error: Missing arguments after '{connector}'.")
+                sys.exit(1)
+
+    first_op = args.operation
+    first_flag, first_val = None, None
+    op_map = vars(args)
+    for f in ["gt", "lt", "eq", "keyword", "swith", "ewith"]:
+        if op_map.get(f):
+            first_flag = f"--{f}"
+            first_val = op_map[f]
+            break
 
     start_time = time.perf_counter()
-    deep = "--deep" in sys.argv
-    file_iterator = get_files(os.getcwd(), deep)
-
-    case_sensitive = "--case" in sys.argv
-    fuzzy = "--fuzzy" in sys.argv
-    
-    number = None
-    if "--top" in sys.argv:
-        idx = sys.argv.index("--top")
-        try:
-            number = int(sys.argv[idx+1])
-        except (IndexError, ValueError):
-            print ("error: Invalid or missing argument for --top.")
-            sys.exit(1)
-
     matching_files = []
-    counter = 0
+    file_iterator = Path(".").rglob("*") if args.deep else Path(".").iterdir()
 
     for path in file_iterator:
         try:
@@ -340,49 +298,28 @@ def main():
         except (FileNotFoundError, PermissionError):
             continue
 
-        content_match1 = False
-        content_match2 = False
-
-        def check_file_content(p, val):
-            if not p.is_file(): return False
-            try:
-                with open(p, "r", encoding="utf-8", errors="ignore") as f:
-                    for line in f:
-                        if not case_sensitive:
-                            if val.lower() in line.lower(): return True
-                        else:
-                            if val in line: return True
-            except Exception:
-                pass
-            return False
-
-        if first_op == "content":
-            content_match1 = check_file_content(path, first_val)
-        if second_op == "content":
-            content_match2 = check_file_content(path, second_val)
+        content_match1 = check_file_content(path, first_val, args.case) if first_op == "content" else False
+        content_match2 = check_file_content(path, second_val, args.case) if second_op == "content" else False
         
-        match1 = satisfies_criteria(path.name, stat_info, first_op, first_flag, first_val, ignore, case_sensitive, fuzzy, content_match1)
+        match1 = satisfies_criteria(path.name, stat_info, first_op, first_flag, first_val, ignore, args.case, args.fuzzy, content_match1)
         
         if connector:
-            match2 = satisfies_criteria(path.name, stat_info, second_op, second_flag, second_val, ignore, case_sensitive, fuzzy, content_match2)
+            match2 = satisfies_criteria(path.name, stat_info, second_op, second_flag, second_val, ignore, args.case, args.fuzzy, content_match2)
             final_match = (match1 or match2) if connector == "or" else (match1 and match2)
         else:
             final_match = match1
 
         if final_match:
-            name = path.name
             raw_mtime = stat_info.st_mtime
             raw_size = stat_info.st_size
-            date_str = datetime.fromtimestamp(raw_mtime).strftime("%d/%m/%y")
+            date_str = datetime.fromtimestamp(raw_mtime).strftime("%d/%y/%m")
             size_str = readable_size(raw_size)
+            matching_files.append([path.name, date_str, size_str, raw_mtime, raw_size, path])
+            if args.top and len(matching_files) >= args.top:
+                break
 
-            matching_files.append([name, date_str, size_str, raw_mtime, raw_size, path])
-            counter += 1
-        
-        if number and counter >= number:
-            break
-
-    if order_field:
+    if args.order:
+        order_field, order_dir = args.order
         rev = (order_dir == "d")
         if order_field == "name":
             matching_files.sort(key=lambda x: x[0].lower(), reverse=rev)
@@ -391,33 +328,75 @@ def main():
         elif order_field == "size":
             matching_files.sort(key=lambda x: x[4], reverse=rev)
 
-    end_time = time.perf_counter()
-    duration = end_time - start_time
+    col_order = args.columns.lower() if len(args.columns) == 3 else "dsn"
 
-    print_files(matching_files, first_op, first_val, second_op, second_val)
-    
-    total = sum(file[4] for file in matching_files)
-    print(f"Showing {len(matching_files)} files ({readable_size(total)}).")
+    for file_info in matching_files:
+        name, date, size_str = file_info[0], file_info[1], file_info[2]
+        raw_size = file_info[4]
+
+        date_display = f" {date} "
+        date_val = highlight(date_display, YELLOW_BG) if first_op == "modified" or second_op == "modified" else date_display
+        if args.nocolor: date_val = date_display
+
+        padded_size_str = f"{size_str:>10}"
+        if first_op == "size" or second_op == "size":
+            size_val = highlight(padded_size_str, YELLOW_BG)
+        else:
+            size_val = padded_size_str
+        
+        if not args.nocolor:
+            size_val = color_by_size(size_val, raw_size)
+
+        name_display = name
+        keywords = [v for v in [first_val, second_val] if v]
+        for kw in keywords:
+            pattern = re.compile(re.escape(kw), re.IGNORECASE)
+            name_display = pattern.sub(lambda m: highlight(m.group(0), YELLOW_BG), name_display)
+
+        path_abs = str(file_info[5].absolute()).replace(os.sep, '/')
+        url = f"file:///{path_abs}"
+        name_val = file_link(name_display, url)
+
+        row = []
+        for char in col_order:
+            if char == 'd': row.append(date_val)
+            elif char == 's': row.append(size_val)
+            elif char == 'n': row.append(name_val)
+        
+        print(" ".join(row))
+
+    total_size = sum(f[4] for f in matching_files)
+    duration = time.perf_counter() - start_time
+    print(f"Showing {len(matching_files)} files ({readable_size(total_size)}).")
     print(f"Completed in {duration:.3f}s.")
 
-    if "--del" in sys.argv and matching_files:
+    if args.exec and matching_files:
+        for file_info in matching_files:
+            path_abs = str(file_info[5].absolute())
+            cmd_parts = [arg.replace('{}', path_abs) for arg in args.exec]
+            subprocess.run(" ".join(cmd_parts), shell=True)
+
+    if args.delete_flag and matching_files:
         confirmation = input(f"warning: {len(matching_files)} items will be deleted. Are you sure? (y/n) ")
         if confirmation.lower() == "y":
-            delete_files(matching_files)
+            for file in matching_files:
+                path = file[5]
+                if path.is_dir():
+                    shutil.rmtree(path)
+                else:
+                    os.remove(path)
             print (f"Deleted {len(matching_files)} items.")
 
-    if "--convert" in sys.argv and matching_files:
-        idx = sys.argv.index("--convert")
-        try:
-            new_ext = sys.argv[idx+1]
-            if not new_ext.startswith("."): new_ext = "." + new_ext
-            confirmation = input(f"warning: {len(matching_files)} files will be converted to {new_ext}. Are you sure? (y/n) ")
-            if confirmation.lower() == "y":
-                convert_files(matching_files, new_ext)
-                print (f"Converted {len(matching_files)} files.")
-        except IndexError:
-            print ("error: Missing extension for --convert.")
-            sys.exit(1)
+    if args.convert and matching_files:
+        new_ext = args.convert if args.convert.startswith(".") else "." + args.convert
+        confirmation = input(f"warning: {len(matching_files)} files will be converted to {new_ext}. Are you sure? (y/n) ")
+        if confirmation.lower() == "y":
+            for file in matching_files:
+                old_path = file[5]
+                if old_path.is_file():
+                    new_path = old_path.with_suffix(new_ext)
+                    old_path.rename(new_path)
+            print (f"Converted {len(matching_files)} files.")
 
 if __name__ == "__main__":
     main()

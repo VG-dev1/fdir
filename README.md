@@ -12,6 +12,10 @@
 <p align="center">
   <img src="https://img.shields.io/github/downloads/VG-dev1/fdir/total" alt="GitHub Downloads (all assets, latest release)">
 
+  <img alt="PyPI - Downloads" src="https://img.shields.io/pypi/dm/fdir-cli?label=PyPi%20downloads">
+
+
+
   <a href="https://github.com/VG-dev1/fdir/releases">
     <img src="https://img.shields.io/github/v/release/VG-dev1/fdir" alt="Latest Release">
   </a>
@@ -45,6 +49,7 @@
 - Hyperlinks to open matching files
 - Heatmap size field letter coloring (blue -> red)
 - Add .fdirignore to your directory to make fdir ignore certain files, directories or extensions
+- Execute another command (`--exec`)
 
 ## Examples
 
@@ -119,24 +124,13 @@ fdir modified --gt 1y or size --gt 1gb --del  # Show files older than 1 year old
 | `--deep`  | Search recursively |
 | `--top`  | Print only the first certain amount of matches |
 | `--fuzzy` | Search approximately (make fdir support typos) |
-
+| `--exec` | Execute another command |
+| `--nocolor` | Don't color the output
 
 ## Installation
 
-### Windows
+### pip
 
-1. Download the "fdir.exe" file from the Releases tab.
-2. Create a new folder in %USERPROFILE% on your computer.
-3. Paste the downloaded "fdir.exe" file into that folder.
-4. Copy the path of that folder.
-5. Put the path of that folder into your system's PATH (run `setx PATH "%PATH%;C:\path\to\fdir_folder"` (replace the path with your actual path)).
-
-### Linux
-
-1. Download the "fdir" file from the Releases tab.
-2. Go to the downloaded "fdir" file's folder (run `cd path/to/your/folder` (replace the path with your actual path)).
-3. Copy that path into `~/.local/bin` (run `cp fdir ~/.local/bin`).
-
-### MacOS
-
-Sorry, not available yet.
+```bash
+pip install fdir-cli
+```
