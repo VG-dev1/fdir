@@ -6,15 +6,11 @@
 </p>
 
 <p align="center">
-  <img src="assets/demo2.png" alt="fdir demo" width="700">
+  <a href="https://ibb.co/2bKXhPr"><img src="https://i.ibb.co/pmXCwZT/demo2.png" alt="demo" border="0"></a>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/downloads/VG-dev1/fdir/total" alt="GitHub Downloads (all assets, latest release)">
-
-  <img alt="PyPI - Downloads" src="https://img.shields.io/pypi/dm/fdir-cli?label=PyPi%20downloads">
-
-
+  <img alt="PyPI - Downloads" src="https://img.shields.io/pypi/dm/fdir-cli">
 
   <a href="https://github.com/VG-dev1/fdir/releases">
     <img src="https://img.shields.io/github/v/release/VG-dev1/fdir" alt="Latest Release">

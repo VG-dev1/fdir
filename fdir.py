@@ -63,7 +63,7 @@ ADDITIONAL FLAGS
     )
 
 def version():
-    print ("fdir v3.2.0, check the GitHub repo for new updates: https://github.com/VG-dev1/fdir")
+    print ("fdir v3.2.1, check the GitHub repo for new updates: https://github.com/VG-dev1/fdir")
 
 def parse_time(value: str) -> timedelta:
     if len(value) < 2:
