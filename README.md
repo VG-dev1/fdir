@@ -1,127 +1,185 @@
-<h1 align="center">fdir</h1>
+# fdir
 
+![PyPI - Downloads](https://img.shields.io/pypi/dm/fdir-cli)
+[![Latest Release](https://img.shields.io/github/v/release/VG-dev1/fdir)](https://github.com/VG-dev1/fdir/releases)
+![GitHub Repo stars](https://img.shields.io/github/stars/VG-dev1/fdir)
+[![GitHub License](https://img.shields.io/github/license/VG-dev1/fdir)](https://github.com/VG-dev1/fdir/blob/main/LICENSE.md)
 
-<p align="center">
-  <i>Find and organize anything on your system</i>
-</p>
+`fdir` is a program for finding and organizing anything on your system. It is a simple and user-friendly way to find the files that you need and do something with them.
 
-<p align="center">
-  <a href="https://ibb.co/2bKXhPr"><img src="https://i.ibb.co/pmXCwZT/demo2.png" alt="demo" border="0"></a>
-</p>
+[Installation](#installation) • [Usage](#usage)
 
-<p align="center">
-  <img alt="PyPI - Downloads" src="https://img.shields.io/pypi/dm/fdir-cli">
-
-  <a href="https://github.com/VG-dev1/fdir/releases">
-    <img src="https://img.shields.io/github/v/release/VG-dev1/fdir" alt="Latest Release">
-  </a>
-
-  <img alt="GitHub Repo stars" src="https://img.shields.io/github/stars/VG-dev1/fdir">
-
-  <a href="https://github.com/VG-dev1/fdir/blob/main/LICENSE.md">
-    <img alt="GitHub License" src="https://img.shields.io/github/license/VG-dev1/fdir">
-  </a>
-</p>
-
----
+![Demo](https://i.ibb.co/pmXCwZT/demo2.png)
 
 ## Features
 
-- List all files and folders in the current directory
-- Filter files by:
-  - Last modified date (`--gt`, `--lt`)
-  - File size (`--gt`, `--lt`)
-  - Name keywords (`--keyword`, `--swith`, `--ewith`)
-  - File type/extension (`--eq`)
-- Sort results by:
-  - Name, size, or modification date (`--order <field> <a|d>`)
-- Use and/or
-- Delete results (`--del`)
-- Convert results to a different extension (`--convert`, available for the `type` operation)
-- Search approximately (`--fuzzy`)
-- Search the content of files
-- Field highlighting in yellow (e.g. using the `modified` operation would highlight the printed dates)
-  - With partial highlighting for the `name` operation
-- Hyperlinks to open matching files
-- Heatmap size field letter coloring (blue -> red)
-- Add .fdirignore to your directory to make fdir ignore certain files, directories or extensions
-- Execute another command (`--exec`)
-
-## Examples
-
-```bash
-fdir modified --gt 1y --order name a  # Show files older than 1 year, in the ascending order by name
-fdir size --lt 100MB --order modified d  # Show files smaller than 100MB, in the descending order by modified
-fdir name --keyword report --order size a --deep  # Show files containing the "report" keyword, in the ascending order by size, and search recursively
-fdir type --eq .wav --order name d --convert .mp3  # Show files with the ".wav" extension, in the descending order by name, and convert them to ".mp3"
-fdir all --order modified a  # Show all files in the ascending order by modified
-fdir modified --gt 1y or size --gt 1gb --del  # Show files older than 1 year old larger than 1GB, and delete them
-```
+- Intuitive syntax: Use operations like `size` or `modified` instead of complex flags.
+- Logical operators: Combine searches with `and` or `or`.
+- Deep search: Traverse directories recursively.
+- Batch processing: Convert file types or delete results directly from the search.
+- Visual feedback: Heatmap coloring for file sizes and highlighting for matched patterns.
+- Smart navigation: Includes hyperlinks to open matching files directly from the terminal.
 
 ## Usage
 
-`fdir <operation> [options] [--order <field> <a|d>]`
+You can get a list of all the commands by running `fdir help`.
 
-#### Operations
+### Searching by name
 
-| Operation | Flags | Description |
-|----------|-------|-------------|
-| `modified` | `--gt \| --lt <time>` | Filter files by last modified date |
-| `size`     | `--gt \| --lt <size>` | Filter files by file size |
-| `name`     | `--keyword \| --swith \| --ewith <pattern>` | Filter files by name |
-| `type`     | `--eq <extension>` | Filter files by file extension |
-| `all`      | — | List all files and directories |
-| `version`  | — | Display the installed version of fdir
-| `content`  | `--keyword <pattern>` | Search the content of textual files
+fdir provides specific flags to match filenames. You can search for a keyword anywhere in the name, or specify if the name starts or ends with a pattern:
 
+```bash
+fdir name --keyword report
+fdir name --swith 2023_
+```
 
-#### Time Units (modified)
+Additionally, you can enable fuzzy (typo-tolerant) search using the `--fuzzy` flag:
 
-| Unit | Meaning |
-|-----|--------|
-| `h` | Hours |
-| `d` | Days |
-| `w` | Weeks |
-| `m` | Months (approx. 30 days) |
-| `y` | Years (approx. 365 days) |
+```bash
+fdir name --keyword reprot --fuzzy
+```
 
+### Searching for a particular file extension
 
-#### Size Units (size)
+Use the `type` operation to find files with a specific extension (including the dot):
 
-| Unit | Meaning |
-|-----|--------|
-| `B`  | Bytes |
-| `KB` | Kilobytes |
-| `MB` | Megabytes |
-| `GB` | Gigabytes |
+```bash
+fdir type --eq .py
+```
 
+### Filtering by modification time
 
-#### Name Flags (name)
+You can filter files based on how long ago they were modified using units like `h` (hours), `d` (days), `w` (weeks), `m` (months), and `y` (years):
 
-| Flag | Description |
-|------|-------------|
-| `--keyword` | Filename contains the pattern |
-| `--swith` | Filename starts with the pattern |
-| `--ewith` | Filename ends with the pattern |
+```bash
+fdir modified --lt 1w
+```
 
+### Searching by keywords inside files
 
-#### Type Flags (type)
+You can even look inside files for keywords using the `content` operation:
 
-| Flag | Description |
-|------|-------------|
-| `--eq` | Match exact file extension (include the dot, e.g. `.py`) |
+```bash
+fdir content --keyword main
+```
 
+> [!NOTE]
+> Only supported for textual files.
 
-#### Additional flags
+### Logical operators
 
-| Flag | Description |
-|------|-------------|
-| `--order` | Sort files in a specific order |
-| `--deep`  | Search recursively |
-| `--top`  | Print only the first certain amount of matches |
-| `--fuzzy` | Search approximately (make fdir support typos) |
-| `--exec` | Execute another command |
-| `--nocolor` | Don't color the output
+Unlike many search tools, fdir allows you to combine two different operations using `and` or `or`:
+
+```bash
+fdir modified --gt 1y or size --gt 1gb
+```
+
+### Command execution
+
+Instead of just listing files, you can execute another command for every result found using the `--exec` flag:
+
+```bash
+fdir type --eq .jpg --exec echo Hi! '{}'
+```
+
+### File deletion
+
+You can delete all the matching files using the `--del` flag:
+
+```bash
+fdir size --gt 1gb --del
+```
+
+### File conversion
+
+The type operation allows you to rename and convert the extensions of all matching files using the `--convert` flag:
+
+```bash
+fdir type --eq .wav --convert .mp3
+```
+
+### Customizing output
+
+#### Print order
+
+You can sort the matching files using the `--order` flag:
+
+```bash
+fdir modified --gt 1y --order modified a
+```
+
+#### Column order
+
+You can reorder the output columns using the `--columns` flag with `n` (name), `d` (date), and `s` (size):
+
+```bash
+fdir all --columns nsd
+```
+
+#### No color output
+
+If you don't want the colored output enabled by default, you can use the `--nocolor` flag:
+
+```bash
+fdir all --nocolor
+```
+
+### Excluding files
+
+You can create a `.fdirignore` file in the directory you're running `fdir` from to exclude certain file names, directories, or extensions. They're like `.gitignore` files, but used by `fdir`.
+
+### Recursive search
+
+By default, `fdir` doesn't search recursively. To enable that, you can use the `--deep` flag:
+
+```bash
+fdir all --deep
+```
+
+## Options
+
+Here are all `fdir`'s options (this is the output of `fdir help`):
+
+```
+Usage:
+  `fdir <operation> [options] [--order <field> <a|d>]
+
+OPERATIONS
+  modified   --gt | --lt <time>     Filter by last modified date
+  size       --gt | --lt <size>     Filter by file size
+  name       --keyword <pattern>    Name contains pattern
+             --swith <pattern>      Name starts with pattern
+             --ewith <pattern>      Name ends with pattern
+  type       --eq <extension>       Match file extension (e.g. .py)
+  all                               List all files and directories
+  version                           Show fdir version
+
+TIME UNITS (modified)
+  h    hours
+  d    days
+  w    weeks
+  m    months (≈30 days)
+  y    years  (≈365 days)
+
+SIZE UNITS (size)
+  B    bytes
+  KB   kilobytes
+  MB   megabytes
+  GB   gigabytes
+
+ADDITIONAL FLAGS
+  --order <field> <a|d>   Sort by: name | size | modified
+                          a = ascending, d = descending
+  --columns <3-chars>     Column order: n (name), d (date), s (size)
+                            Example: nds
+  --deep                  Search recursively
+  --top <n>               Show only first N results
+  --fuzzy                 Search approximately
+  --del                   Delete matching files
+  --convert               Convert matching files
+  --exec <command>         Execute command for each match (use {} for path)
+  --nocolor               Disable the output coloring
+```
 
 ## Installation
 
