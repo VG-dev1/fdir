@@ -11,59 +11,18 @@ import time
 import re
 import subprocess
 import argparse
+import ctypes
 
 RESET = "\033[0m"
-YELLOW_BG = "\033[43m"
+YELLOW_BG = "\033[48;5;136m"
 BLUE   = "\033[38;5;39m"
 GREEN  = "\033[38;5;82m"
 YELLOW = "\033[38;5;226m"
 ORANGE = "\033[38;5;214m"
 RED    = "\033[38;5;196m"
 
-def usage():
-    print(
-        """Usage:
-  `fdir <operation> [options] [--order <field> <a|d>]
-
-OPERATIONS
-  modified   --gt | --lt <time>     Filter by last modified date
-  size       --gt | --lt <size>     Filter by file size
-  name       --keyword <pattern>    Name contains pattern
-             --swith <pattern>      Name starts with pattern
-             --ewith <pattern>      Name ends with pattern
-  type       --eq <extension>       Match file extension (e.g. .py)
-  all                               List all files and directories
-  version                           Show fdir version
-
-TIME UNITS (modified)
-  h    hours
-  d    days
-  w    weeks
-  m    months (≈30 days)
-  y    years  (≈365 days)
-
-SIZE UNITS (size)
-  B    bytes
-  KB   kilobytes
-  MB   megabytes
-  GB   gigabytes
-
-ADDITIONAL FLAGS
-  --order <field> <a|d>   Sort by: name | size | modified
-                          a = ascending, d = descending
-  --columns <3-chars>     Column order: n (name), d (date), s (size)
-                          Example: nds
-  --deep                  Search recursively
-  --top <n>               Show only first N results
-  --fuzzy                 Search approximately
-  --del                   Delete matching files
-  --convert               Convert matching files
-  -exec <command>         Execute command for each match (use {} for path)
-"""
-    )
-
 def version():
-    print ("fdir v3.2.1, check the GitHub repo for new updates: https://github.com/VG-dev1/fdir")
+    print ("fdir v3.3.0, check the GitHub repo for new updates: https://github.com/VG-dev1/fdir")
 
 def parse_time(value: str) -> timedelta:
     if len(value) < 2:
@@ -202,59 +161,78 @@ def satisfies_criteria(path_name, stat_info, op, flag, value, ignore, case_sensi
             if flag == "--swith": return file_name.startswith(name_arg)
             if flag == "--ewith": return file_name.endswith(name_arg)
     if op == "type":
-        return path_name.lower().endswith(value.lower())
+        if not case_sensitive:
+            return path_name.lower().endswith(value.lower())
+        return path_name.endswith(value)
     if op == "content":
         return content_found
     return False
+
+def is_hidden(path: Path) -> bool:
+    if os.name == "posix":
+        if path.name.startswith('.'):
+            return True
+        return False
+    if os.name == 'nt':
+        try:
+            attrs = os.stat(str(path.absolute())).st_file_attributes
+            return bool(attrs & 2)
+        except (AttributeError, OSError):
+            return False
 
 def main():
     if os.name == 'nt':
         os.system('color')
 
     parent_parser = argparse.ArgumentParser(add_help=False)
-    parent_parser.add_argument("--deep", action="store_true")
-    parent_parser.add_argument("--top", type=int)
-    parent_parser.add_argument("--fuzzy", action="store_true")
-    parent_parser.add_argument("--case", action="store_true")
-    parent_parser.add_argument("--order", nargs=2)
-    parent_parser.add_argument("--columns", default="dsn")
-    parent_parser.add_argument("--del", action="store_true", dest="delete_flag")
-    parent_parser.add_argument("--convert")
-    parent_parser.add_argument("--nocolor", action="store_true")
-    parent_parser.add_argument("--exec", nargs=argparse.REMAINDER)
+    parent_parser.add_argument("--deep", action="store_true", help="Search recursively")
+    parent_parser.add_argument("--top", type=int, metavar=('NUMBER'), help="Show only first N results")
+    parent_parser.add_argument("--fuzzy", action="store_true", help="Search approximately")
+    parent_parser.add_argument("--case", action="store_true", help="Case-sensitive search")
+    parent_parser.add_argument("--order", nargs=2, metavar=('FIELD', 'DIR'), help="Sort: <name|size|modified> <a|d>")
+    parent_parser.add_argument("--columns", default="dsn", help="Column order (e.g., nds)")
+    parent_parser.add_argument("--del", action="store_true", dest="delete_flag", help="Delete matches")
+    parent_parser.add_argument("--convert", metavar=('EXTENSION'), help="Convert to new extension")
+    parent_parser.add_argument("--nocolor", action="store_true", help="Disable colors")
+    parent_parser.add_argument("--exec", nargs=argparse.REMAINDER, help="Execute command (use {} for path)")
+    parent_parser.add_argument("--hidden", action="store_true", help="Show hidden files in search")
 
-    parser = argparse.ArgumentParser(prog="fdir", parents=[parent_parser], add_help=False)
-    subparsers = parser.add_subparsers(dest="operation")
+    parser = argparse.ArgumentParser(
+        prog="fdir",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        parents=[parent_parser]
+    )
+    
+    subparsers = parser.add_subparsers(dest="operation", required=True)
 
-    mod_parser = subparsers.add_parser("modified", parents=[parent_parser], add_help=False)
-    mod_parser.add_argument("--gt")
-    mod_parser.add_argument("--lt")
+    mod_p = subparsers.add_parser("modified", parents=[parent_parser], help="Filter by date")
+    mod_p.add_argument("--gt", metavar=('TIMESTAMP'), help="Older than (e.g. 2d)")
+    mod_p.add_argument("--lt", metavar=('TIMESTAMP'), help="Newer than")
 
-    size_parser = subparsers.add_parser("size", parents=[parent_parser], add_help=False)
-    size_parser.add_argument("--gt")
-    size_parser.add_argument("--lt")
+    size_p = subparsers.add_parser("size", parents=[parent_parser], help="Filter by size")
+    size_p.add_argument("--gt", metavar=('SIZE'), help="Larger than (e.g. 10MB)")
+    size_p.add_argument("--lt", metavar=('SIZE'), help="Smaller than")
 
-    name_parser = subparsers.add_parser("name", parents=[parent_parser], add_help=False)
-    name_parser.add_argument("--keyword")
-    name_parser.add_argument("--swith")
-    name_parser.add_argument("--ewith")
+    name_p = subparsers.add_parser("name", parents=[parent_parser], help="Filter by name")
+    name_p.add_argument("--keyword", metavar=('KEYWORD'), help="Contains pattern")
+    name_p.add_argument("--swith", metavar=('KEYWORD'), help="Starts with")
+    name_p.add_argument("--ewith", metavar=('KEYWORD'), help="Ends with")
 
-    type_parser = subparsers.add_parser("type", parents=[parent_parser], add_help=False)
-    type_parser.add_argument("--eq")
+    type_p = subparsers.add_parser("type", parents=[parent_parser], help="Filter by extension")
+    type_p.add_argument("--eq", metavar=('EXTENSION'), help="Match extension (e.g. .py)")
 
-    cont_parser = subparsers.add_parser("content", parents=[parent_parser], add_help=False)
-    cont_parser.add_argument("--keyword")
+    con_p = subparsers.add_parser("content", parents=[parent_parser], help="Search inside file content")
+    con_p.add_argument("--keyword", metavar=('KEYWORD'), help="Contains pattern")
 
-    subparsers.add_parser("all", parents=[parent_parser], add_help=False)
-    subparsers.add_parser("version", parents=[parent_parser], add_help=False)
-    subparsers.add_parser("help", parents=[parent_parser], add_help=False)
+    subparsers.add_parser("all", parents=[parent_parser], help="List all files")
+    subparsers.add_parser("version", parents=[parent_parser], help="Show version")
+
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit(0)
 
     args, unknown = parser.parse_known_args()
 
-    if args.operation == "help":
-        usage()
-        sys.exit(0)
-    
     if args.operation == "version":
         version()
         sys.exit(0)
@@ -297,6 +275,12 @@ def main():
             stat_info = path.stat()
         except (FileNotFoundError, PermissionError):
             continue
+        if not args.hidden:
+            hidden = is_hidden(path)
+            if hidden:
+                continue
+        
+        display_name = path.name + "/" if path.is_dir() else path.name
 
         content_match1 = check_file_content(path, first_val, args.case) if first_op == "content" else False
         content_match2 = check_file_content(path, second_val, args.case) if second_op == "content" else False
@@ -314,40 +298,45 @@ def main():
             raw_size = stat_info.st_size
             date_str = datetime.fromtimestamp(raw_mtime).strftime("%d/%y/%m")
             size_str = readable_size(raw_size)
-            matching_files.append([path.name, date_str, size_str, raw_mtime, raw_size, path])
+            matching_files.append([display_name, date_str, size_str, raw_mtime, raw_size, path])
             if args.top and len(matching_files) >= args.top:
                 break
 
+    if not matching_files:
+        print("No matches found.")
+        sys.exit(0)
+
+    sort_map = {"name": lambda x: x[0].lower(), "modified": lambda x: x[3], "size": lambda x: x[4]}
     if args.order:
-        order_field, order_dir = args.order
-        rev = (order_dir == "d")
-        if order_field == "name":
-            matching_files.sort(key=lambda x: x[0].lower(), reverse=rev)
-        elif order_field == "modified":
-            matching_files.sort(key=lambda x: x[3], reverse=rev)
-        elif order_field == "size":
-            matching_files.sort(key=lambda x: x[4], reverse=rev)
+        field, direction = args.order
+        matching_files.sort(key=sort_map.get(field, sort_map["name"]), reverse=(direction == "d"))
 
     col_order = args.columns.lower() if len(args.columns) == 3 else "dsn"
+
+    max_name_len = max((len(f[0]) for f in matching_files), default=0) + 2
+    max_date_len = max((len(f[1]) for f in matching_files), default=0) + 2
+    max_size_len = max((len(f[2]) for f in matching_files), default=0) + 2
+
+    max_name_len = max((len(f[0]) for f in matching_files), default=0)
+    max_date_len = max((len(f[1]) for f in matching_files), default=0)
+    max_size_len = max((len(f[2]) for f in matching_files), default=0)
 
     for file_info in matching_files:
         name, date, size_str = file_info[0], file_info[1], file_info[2]
         raw_size = file_info[4]
 
-        date_display = f" {date} "
-        date_val = highlight(date_display, YELLOW_BG) if first_op == "modified" or second_op == "modified" else date_display
-        if args.nocolor: date_val = date_display
+        p_date = f"{date:<{max_date_len}}"
+        p_size = f"{size_str:>{max_size_len}}"
+        p_name = f"{name:<{max_name_len}}"
 
-        padded_size_str = f"{size_str:>10}"
-        if first_op == "size" or second_op == "size":
-            size_val = highlight(padded_size_str, YELLOW_BG)
-        else:
-            size_val = padded_size_str
-        
+        date_val = highlight(p_date, YELLOW_BG) if "modified" in [first_op, second_op] else p_date
+        if args.nocolor: date_val = p_date
+
+        size_val = highlight(p_size, YELLOW_BG) if "size" in [first_op, second_op] else p_size
         if not args.nocolor:
             size_val = color_by_size(size_val, raw_size)
 
-        name_display = name
+        name_display = p_name
         keywords = [v for v in [first_val, second_val] if v]
         for kw in keywords:
             pattern = re.compile(re.escape(kw), re.IGNORECASE)
@@ -362,8 +351,8 @@ def main():
             if char == 'd': row.append(date_val)
             elif char == 's': row.append(size_val)
             elif char == 'n': row.append(name_val)
-        
-        print(" ".join(row))
+
+        print("  ".join(row))
 
     total_size = sum(f[4] for f in matching_files)
     duration = time.perf_counter() - start_time
