@@ -22,7 +22,7 @@
 
 ## Usage
 
-You can get a list of all the commands by running `fdir help`.
+You can get a list of all the commands by running `fdir --help`.
 
 ### Searching by name
 
@@ -65,6 +65,13 @@ fdir content --keyword main
 
 > [!NOTE]
 > Only supported for textual files.
+
+### Searching for hidden files
+
+fdir doesn't show hidden files by default. To show them, add the `--hidden` flag.
+
+> [!NOTE]
+> This only shows files that weren't hidden using a `.fdirignore` file.
 
 ### Logical operators
 
@@ -138,47 +145,36 @@ fdir all --deep
 
 ## Options
 
-Here are all `fdir`'s options (this is the output of `fdir help`):
+Here are all `fdir`'s options (this is the output of `fdir --help`):
 
 ```
-Usage:
-  `fdir <operation> [options] [--order <field> <a|d>]
+usage: fdir [-h] [--deep] [--top NUMBER] [--fuzzy] [--case] [--order FIELD DIR] [--columns COLUMNS] [--del]
+            [--convert EXTENSION] [--nocolor] [--exec ...] [--hidden]
+            {modified,size,name,type,content,all,version} ...
 
-OPERATIONS
-  modified   --gt | --lt <time>     Filter by last modified date
-  size       --gt | --lt <size>     Filter by file size
-  name       --keyword <pattern>    Name contains pattern
-             --swith <pattern>      Name starts with pattern
-             --ewith <pattern>      Name ends with pattern
-  type       --eq <extension>       Match file extension (e.g. .py)
-  all                               List all files and directories
-  version                           Show fdir version
+positional arguments:
+  {modified,size,name,type,content,all,version}
+    modified            Filter by date
+    size                Filter by size
+    name                Filter by name
+    type                Filter by extension
+    content             Search inside file content
+    all                 List all files
+    version             Show version
 
-TIME UNITS (modified)
-  h    hours
-  d    days
-  w    weeks
-  m    months (≈30 days)
-  y    years  (≈365 days)
-
-SIZE UNITS (size)
-  B    bytes
-  KB   kilobytes
-  MB   megabytes
-  GB   gigabytes
-
-ADDITIONAL FLAGS
-  --order <field> <a|d>   Sort by: name | size | modified
-                          a = ascending, d = descending
-  --columns <3-chars>     Column order: n (name), d (date), s (size)
-                            Example: nds
-  --deep                  Search recursively
-  --top <n>               Show only first N results
-  --fuzzy                 Search approximately
-  --del                   Delete matching files
-  --convert               Convert matching files
-  --exec <command>         Execute command for each match (use {} for path)
-  --nocolor               Disable the output coloring
+options:
+  -h, --help            show this help message and exit
+  --deep                Search recursively
+  --top NUMBER          Show only first N results
+  --fuzzy               Search approximately
+  --case                Case-sensitive search
+  --order FIELD DIR     Sort: <name|size|modified> <a|d>
+  --columns COLUMNS     Column order (e.g., nds)
+  --del                 Delete matches
+  --convert EXTENSION   Convert to new extension
+  --nocolor             Disable colors
+  --exec ...            Execute command (use {} for path)
+  --hidden              Show hidden files in search
 ```
 
 ## Installation
