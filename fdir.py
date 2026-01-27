@@ -22,7 +22,7 @@ ORANGE = "\033[38;5;214m"
 RED    = "\033[38;5;196m"
 
 def version():
-    print ("fdir v3.3.0, check the GitHub repo for new updates: https://github.com/VG-dev1/fdir")
+    print ("fdir v3.3.1, check the GitHub repo for new updates: https://github.com/VG-dev1/fdir")
 
 def parse_time(value: str) -> timedelta:
     if len(value) < 2:
