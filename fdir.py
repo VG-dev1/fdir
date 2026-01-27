@@ -122,16 +122,17 @@ def fuzzy_match(query, file_name, threshold=0.6):
     return ratio >= threshold
 
 def check_file_content(p, val, case_sensitive):
-    if not p.is_file(): return False
+    if not p.is_file(): 
+        return False
+    search_val = val.lower() if not case_sensitive else val
     try:
         with open(p, "r", encoding="utf-8", errors="ignore") as f:
             for line in f:
-                if not case_sensitive:
-                    if val.lower() in line.lower(): return True
-                else:
-                    if val in line: return True
-    except Exception:
-        pass
+                current_line = line.lower() if not case_sensitive else line
+                if search_val in current_line:
+                    return True
+    except (OSError, IOError):
+        pass   
     return False
 
 def satisfies_criteria(path_name, stat_info, op, flag, value, ignore, case_sensitive, fuzzy, content_found):
