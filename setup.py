@@ -7,7 +7,7 @@ README = (HERE / "README.md").read_text()
 
 setup(
     name="fdir-cli",
-    version="3.3.0",
+    version="3.3.1",
     description="Find and organize anything on your system",
     long_description=README,
     long_description_content_type="text/markdown",
