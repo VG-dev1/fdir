@@ -2,14 +2,13 @@
 
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/fdir-cli)
 [![Latest Release](https://img.shields.io/github/v/release/VG-dev1/fdir)](https://github.com/VG-dev1/fdir/releases)
-![GitHub Repo stars](https://img.shields.io/github/stars/VG-dev1/fdir)
 [![GitHub License](https://img.shields.io/github/license/VG-dev1/fdir)](https://github.com/VG-dev1/fdir/blob/main/LICENSE.md)
 
-`fdir` is a program for finding and organizing anything on your system. It is a simple and user-friendly way to find the files that you need and do something with them.
+fdir is the search language for your filesystem - a fast, intuitive way to find, filter, and act on files using human-friendly commands.
 
 [Installation](#installation) • [Usage](#usage)
 
-![Demo](https://i.ibb.co/pmXCwZT/demo2.png)
+![Demo](assets/fdir.gif)
 
 ## Features
 
@@ -63,9 +62,6 @@ You can even look inside files for keywords using the `content` operation:
 fdir content --keyword main
 ```
 
-> [!NOTE]
-> Only supported for textual files.
-
 ### Searching for hidden files
 
 fdir doesn't show hidden files by default. To show them, add the `--hidden` flag.
@@ -83,11 +79,14 @@ fdir modified --gt 1y or size --gt 1gb
 
 ### Command execution
 
-Instead of just listing files, you can execute another command for every result found using the `--exec` flag:
+Instead of just listing files, you can execute another command for every result found using the `--exec` flag (use `{}` as a placeholder):
 
 ```bash
-fdir type --eq .jpg --exec echo Hi! '{}'
+fdir type --eq .jpg --exec echo Hi! {}
 ```
+
+> [!NOTE]
+> On Windows Powershell, you might need to wrap the placeholder in quotes, like this: `'{}'`.
 
 ### File deletion
 
