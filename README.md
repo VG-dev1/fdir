@@ -1,7 +1,7 @@
 # fdir
 
+[![Version info](https://img.shields.io/pypi/v/fdir-cli.svg)](https://pypi.org/project/fdir-cli/)
 ![PyPI - Downloads](https://img.shields.io/pypi/dm/fdir-cli)
-[![Latest Release](https://img.shields.io/github/v/release/VG-dev1/fdir)](https://github.com/VG-dev1/fdir/releases)
 [![GitHub License](https://img.shields.io/github/license/VG-dev1/fdir)](https://github.com/VG-dev1/fdir/blob/main/LICENSE.md)
 
 fdir is the search language for your filesystem - a fast, intuitive way to find, filter, and act on files using human-friendly commands.
@@ -79,10 +79,10 @@ fdir modified --gt 1y or size --gt 1gb
 
 ### Command execution
 
-Instead of just listing files, you can execute another command for every result found using the `--exec` flag (use `{}` as a placeholder):
+Instead of just listing files, you can execute another command for every result found using the `--exec` flag (use `{}` as a placeholder for path):
 
 ```bash
-fdir type --eq .jpg --exec echo Hi! {}
+fdir type --eq .jpg --exec xdg-open {}
 ```
 
 > [!NOTE]
@@ -178,7 +178,9 @@ options:
 
 ## Installation
 
-### pip
+### From source
+
+With Python's package manager `pip`, you can install fdir via:
 
 ```bash
 pip install fdir-cli
