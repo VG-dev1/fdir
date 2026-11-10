@@ -297,7 +297,7 @@ def main():
         if final_match:
             raw_mtime = stat_info.st_mtime
             raw_size = stat_info.st_size
-            date_str = datetime.fromtimestamp(raw_mtime).strftime("%d/%y/%m")
+            date_str = datetime.fromtimestamp(raw_mtime).strftime("%d/%m/%y")
             size_str = readable_size(raw_size)
             matching_files.append([display_name, date_str, size_str, raw_mtime, raw_size, path])
             if args.top and len(matching_files) >= args.top:
